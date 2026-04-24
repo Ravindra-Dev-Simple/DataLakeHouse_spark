@@ -52,7 +52,7 @@ NESSIE_REF        = os.environ.get("NESSIE_REF", "main")
 # ----------------------------------------------------------------
 # TRINO CONFIGURATION
 # ----------------------------------------------------------------
-TRINO_HOST        = os.environ.get(
+TRINO_HOST = os.environ.get(
     "TRINO_HOST",
     "trino.lakehouse-catalog.svc.cluster.local"
 )

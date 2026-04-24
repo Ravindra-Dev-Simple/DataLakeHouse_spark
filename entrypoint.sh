@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Parse --mode flag to decide execution strategy
 MODE=""
 prev=""
 for arg in "$@"; do
@@ -15,15 +14,18 @@ done
 cd /app
 
 if [ "$MODE" = "kafka" ]; then
-    echo "==> Running kafka mode via spark-submit"
+    echo "==> Running kafka consume mode via spark-submit"
     exec /opt/spark/bin/spark-submit \
         --conf spark.driver.extraJavaOptions=-Daws.region=${AWS_REGION} \
         --conf spark.executor.extraJavaOptions=-Daws.region=${AWS_REGION} \
         -m app.index "$@"
+elif [ "$MODE" = "produce" ]; then
+    echo "==> Running produce mode (Kafka bulk producer)"
+    exec python3 -m app.index "$@"
 elif [ "$MODE" = "trino" ]; then
-    echo "==> Running trino mode"
-    exec python -m app.index "$@"
+    echo "==> Running trino query mode"
+    exec python3 -m app.index "$@"
 else
-    echo "==> Default: running python"
-    exec python -m app.index "$@"
+    echo "==> Default: python3 -m app.index"
+    exec python3 -m app.index "$@"
 fi
