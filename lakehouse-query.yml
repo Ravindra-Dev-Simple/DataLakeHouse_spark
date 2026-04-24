@@ -1,0 +1,47 @@
+# ================================================================
+# lakehouse-query.yaml
+# Trino queries Iceberg Bronze tables and prints row counts
+# ================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lakehouse-query
+  namespace: lakehouse-ingest
+  labels:
+    app: lakehouse
+    mode: query
+spec:
+  restartPolicy: Never
+  containers:
+  - name: query
+    image: docker.io/shaikhabdullah1610/trino-poc_openshift:v2
+    imagePullPolicy: Always
+    command: ["python3"]
+    args:
+      - "-m"
+      - "app.index"
+      - "--mode"
+      - "trino"
+      - "--section"
+      - "counts"
+    workingDir: /app
+    env:
+    - name: TRINO_HOST
+      value: "trino-external.lakehouse-catalog.svc.cluster.local"
+    - name: TRINO_PORT
+      value: "8080"
+    - name: TRINO_USER
+      value: "admin"
+    - name: TRINO_CATALOG
+      value: "iceberg"
+    - name: TRINO_SCHEMA
+      value: "bronze"
+    - name: TRINO_HTTP_SCHEME
+      value: "http"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"

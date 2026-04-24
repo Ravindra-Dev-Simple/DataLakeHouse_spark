@@ -1,0 +1,70 @@
+# ================================================================
+# lakehouse-consumer.yaml
+# Spark reads Kafka → writes Iceberg tables in MinIO (Bronze layer)
+# ================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lakehouse-consumer
+  namespace: lakehouse-ingest
+  labels:
+    app: lakehouse
+    mode: consume
+spec:
+  restartPolicy: Never
+  containers:
+  - name: consumer
+    image: docker.io/shaikhabdullah1610/trino-poc_openshift:v2
+    imagePullPolicy: Always
+    args:
+      - "--mode"
+      - "kafka"
+      - "--topic"
+      - "finacle-transactions"
+    env:
+    # Kafka
+    - name: KAFKA_BOOTSTRAP_SERVERS
+      value: "my-cluster-kafka-bootstrap.lakehouse-ingest.svc.cluster.local:9092"
+    - name: KAFKA_SECURITY_PROTOCOL
+      value: "SASL_PLAINTEXT"
+    - name: KAFKA_SASL_MECHANISM
+      value: "SCRAM-SHA-512"
+    - name: KAFKA_USERNAME
+      value: "app-user"
+    - name: KAFKA_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: kafka-creds
+          key: password
+    # MinIO / S3
+    - name: S3_ENDPOINT
+      value: "http://minio-api.lakehouse-data.svc.cluster.local:9000"
+    - name: S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: minio-creds
+          key: access-key
+    - name: S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: minio-creds
+          key: secret-key
+    - name: S3_REGION
+      value: "us-east-1"
+    # Iceberg / Nessie
+    - name: ICEBERG_WAREHOUSE
+      value: "s3a://lakehouse-warehouse/warehouse"
+    - name: NESSIE_URI
+      value: "http://nessie.lakehouse-catalog.svc:19120/api/v2"
+    - name: NESSIE_REF
+      value: "main"
+    # AWS region for S3 SDK
+    - name: AWS_REGION
+      value: "us-east-1"
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "2"

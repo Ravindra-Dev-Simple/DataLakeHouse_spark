@@ -1,0 +1,50 @@
+# ================================================================
+# lakehouse-producer.yaml
+# Generates 10,000 fake banking transactions and pushes to Kafka
+# ================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lakehouse-producer
+  namespace: lakehouse-ingest
+  labels:
+    app: lakehouse
+    mode: produce
+spec:
+  restartPolicy: Never
+  containers:
+  - name: producer
+    image: docker.io/shaikhabdullah1610/trino-poc_openshift:v2
+    imagePullPolicy: Always
+    command: ["python3"]
+    args:
+      - "-m"
+      - "app.index"
+      - "--mode"
+      - "produce"
+      - "--count"
+      - "10000"
+      - "--days"
+      - "30"
+    workingDir: /app
+    env:
+    - name: KAFKA_BOOTSTRAP_SERVERS
+      value: "my-cluster-kafka-bootstrap.lakehouse-ingest.svc.cluster.local:9092"
+    - name: KAFKA_SECURITY_PROTOCOL
+      value: "SASL_PLAINTEXT"
+    - name: KAFKA_SASL_MECHANISM
+      value: "SCRAM-SHA-512"
+    - name: KAFKA_USERNAME
+      value: "app-user"
+    - name: KAFKA_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: kafka-creds
+          key: password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "1"
