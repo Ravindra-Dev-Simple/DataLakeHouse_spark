@@ -226,11 +226,12 @@ def _create_spark_session():
 # PROCESSING FUNCTIONS
 # ----------------------------------------------------------------
 def _process_batch(spark, kafka_options, topic, schema, iceberg_table) -> int:
-    """One topic ka batch — read all available, write once."""
+    """One topic ka batch — read all available, APPEND to Iceberg+Nessie."""
     from pyspark.sql.functions import col, from_json, current_timestamp, lit
 
     log.info("Processing: %s → %s", topic, iceberg_table)
 
+    # ---- Read from Kafka ----
     df_raw = (
         spark.read
         .format("kafka")
@@ -246,6 +247,7 @@ def _process_batch(spark, kafka_options, topic, schema, iceberg_table) -> int:
 
     log.info("Found %d messages in Kafka", msg_count)
 
+    # ---- Parse JSON ----
     df_parsed = (
         df_raw
         .selectExpr("CAST(key AS STRING) as kafka_key",
@@ -262,13 +264,42 @@ def _process_batch(spark, kafka_options, topic, schema, iceberg_table) -> int:
     row_count = df_parsed.count()
     log.info("Parsed %d rows", row_count)
 
-    (
-        df_parsed.writeTo(iceberg_table)
-        .tableProperty("format-version", "2")
-        .createOrReplace()
-    )
+    # ---- Write to Iceberg (with Nessie registration) ----
+    # Check if table already exists in Nessie catalog
+    try:
+        table_exists = spark.catalog.tableExists(iceberg_table)
+        log.info("Table existence check: %s = %s", iceberg_table, table_exists)
+    except Exception as e:
+        log.warning("Could not check table existence: %s", e)
+        table_exists = False
+
+    if not table_exists:
+        # First time — CREATE the table (registers in Nessie)
+        log.info("Creating new Iceberg table: %s", iceberg_table)
+        (
+            df_parsed.writeTo(iceberg_table)
+            .tableProperty("format-version", "2")
+            .tableProperty("write.format.default", "parquet")
+            .tableProperty("write.parquet.compression-codec", "snappy")
+            .create()
+        )
+        log.info("✓ Table created and registered in Nessie")
+    else:
+        # Subsequent runs — APPEND (preserves history)
+        log.info("Appending to existing table: %s", iceberg_table)
+        df_parsed.writeTo(iceberg_table).append()
+        log.info("✓ Appended to existing Nessie-registered table")
 
     log.info("✓ Written %d rows to %s", row_count, iceberg_table)
+
+    # ---- Verify Nessie registration ----
+    try:
+        verify_count = spark.table(iceberg_table).count()
+        log.info("✓ Nessie verified — table has %d total rows", verify_count)
+    except Exception as e:
+        log.error("✗ Nessie verification FAILED: %s", e)
+        log.error("   Files in MinIO but NOT registered in Nessie!")
+
     return row_count
 
 
