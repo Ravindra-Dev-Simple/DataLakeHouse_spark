@@ -18,7 +18,7 @@ if [ "$MODE" = "kafka" ]; then
     exec /opt/spark/bin/spark-submit \
         --conf spark.driver.extraJavaOptions=-Daws.region=${AWS_REGION} \
         --conf spark.executor.extraJavaOptions=-Daws.region=${AWS_REGION} \
-        /app/app/index.py "$@"         ⬅️ ✅ LINE 18 — YEH SAHI
+        /app/app/index.py "$@"      
 elif [ "$MODE" = "produce" ]; then
     echo "==> Running produce mode (Kafka bulk producer)"
     exec python3 -m app.index "$@"
